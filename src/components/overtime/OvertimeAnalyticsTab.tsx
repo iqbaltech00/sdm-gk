@@ -1,15 +1,35 @@
 import React from 'react';
-import { ShieldCheck, FileCheck, Info, Printer } from 'lucide-react';
+import { ShieldCheck, FileCheck, Info, Printer, Download } from 'lucide-react';
 import { NeuCard, NeuInset } from '../ui/NeuCard';
 import { NeuBadge } from '../ui/NeuBadge';
 import { NeuButton } from '../ui/NeuButton';
 import { NeuInput, NeuSelect } from '../ui/NeuForms';
 import { formatRupiah } from '../../utils/format';
+import { exportToCSV } from '../../utils/exportExcel';
 
 export function OvertimeAnalyticsTab() {
   const completedSPL = [
     { id: 'SPL-1', nik: 'SGN001', nama: 'Budi Santoso', stasiun: 'GILINGAN', bagian: 'TEKNIK', tipe: 'Hari Kerja', tgl: '2026-10-26', jam: 3, setara: 4.5, breakdown: '1j × 1.5x + 2.0j × 2.0x', biaya: 113153 }
   ];
+
+  const handleExportReport = () => {
+    // Format data untuk ekspor spreadsheet
+    const exportData = completedSPL.map(item => ({
+      'ID SPL': item.id,
+      'NIK': item.nik,
+      'Nama Karyawan': item.nama,
+      'Stasiun': item.stasiun,
+      'Bagian': item.bagian,
+      'Tipe Hari': item.tipe,
+      'Tanggal': item.tgl,
+      'Durasi Jam': item.jam,
+      'Jam Setara (Depnaker)': item.setara,
+      'Rincian Progresif': item.breakdown,
+      'Total Upah Realisasi (Rp)': item.biaya
+    }));
+
+    exportToCSV(exportData, `Laporan_Realisasi_Lembur_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
 
   return (
     <div className="animate-in fade-in duration-300">
@@ -51,7 +71,12 @@ export function OvertimeAnalyticsTab() {
             </h5>
             <small className="text-neu-muted">Menampilkan daftar SPL berstatus disetujui penuh (Step 6) untuk audit & penggajian.</small>
           </div>
-          <NeuBadge variant="success" className="text-sm px-4 py-2 self-start md:self-center">1 SPL Selesai</NeuBadge>
+          <div className="flex gap-2">
+            <NeuButton variant="success" onClick={handleExportReport} className="text-xs py-2 px-3">
+              <Download size={14} className="mr-1.5" /> Export Laporan CSV/Excel
+            </NeuButton>
+            <NeuBadge variant="success" className="text-sm px-4 py-2 self-start md:self-center">1 SPL Selesai</NeuBadge>
+          </div>
         </div>
 
         <NeuInset className="p-4 mb-4">

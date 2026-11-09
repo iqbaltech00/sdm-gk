@@ -7,7 +7,6 @@ import { OvertimeAnalyticsTab } from '../components/overtime/OvertimeAnalyticsTa
 import { OvertimePolicyTab } from '../components/overtime/OvertimePolicyTab';
 import { OvertimeFormModal } from '../components/overtime/OvertimeFormModal';
 import { useAuthStore } from '../store/authStore';
-
 export function Overtime() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'list' | 'analytics' | 'policy'>('dashboard');
   const [showForm, setShowForm] = useState(false);
@@ -50,7 +49,6 @@ export function Overtime() {
           Analisis & Biaya
         </NeuButton>
         
-        {/* Tab Kebijakan hanya relevan jika role memiliki akses Konfigurasi */}
         {['asman_sdm', 'admin_sdm', 'manager_keuangan', 'gm'].includes(role) && (
           <NeuButton 
             variant="default" 

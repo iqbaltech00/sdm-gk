@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, LogIn } from 'lucide-react';
+import { ShieldAlert, LogIn, AlertCircle } from 'lucide-react';
 import { NeuCard, NeuInset } from '../components/ui/NeuCard';
 import { NeuButton } from '../components/ui/NeuButton';
 import { NeuInput, NeuSelect } from '../components/ui/NeuForms';
@@ -24,6 +24,7 @@ export function Login() {
   const [username, setUsername] = useState(roleUsernames['asman_sdm']);
   const [pin, setPin] = useState('12345678');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedRole = e.target.value;
@@ -31,15 +32,19 @@ export function Login() {
     setUsername(roleUsernames[selectedRole] || 'USER_01');
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage('');
     
-    // Simulasi delay login
-    setTimeout(() => {
-      login(role as any, username);
+    const result = await login(username, pin);
+    
+    setIsLoading(false);
+    if (result.success) {
       navigate('/');
-    }, 800);
+    } else {
+      setErrorMessage(result.error || 'Terjadi kesalahan saat masuk.');
+    }
   };
 
   return (
@@ -52,6 +57,13 @@ export function Login() {
           <h3 className="text-2xl font-bold text-gray-900 mb-1">SGN HR Super App</h3>
           <p className="text-neu-muted text-sm m-0">PT Sinergi Gula Nusantara - Unit Pabrik Gula</p>
         </div>
+
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl flex items-center gap-2 font-medium">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
@@ -88,12 +100,12 @@ export function Login() {
           </div>
 
           <NeuButton type="submit" variant="primary" className="w-full py-3 text-base mt-2" disabled={isLoading}>
-            {isLoading ? 'Memverifikasi...' : <><LogIn size={20} className="mr-2" /> Masuk ke Aplikasi</>}
+            {isLoading ? 'Menghubungkan ke Supabase...' : <><LogIn size={20} className="mr-2" /> Masuk ke Aplikasi</>}
           </NeuButton>
         </form>
 
         <div className="mt-8 pt-4 text-center text-neu-muted text-xs border-t border-white/40">
-          <span>Soft UI Neumorphism React v1.0 (Migrated)</span>
+          <span>Supabase Auth & Neumorphism React v1.0</span>
         </div>
       </NeuCard>
     </div>

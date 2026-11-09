@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, Calculator, Clock, CalendarEvent, Save, Plus } from 'lucide-react';
+import { Sliders, Calculator, Clock, Calendar, Save, Plus } from 'lucide-react';
 import { NeuCard, NeuInset } from '../ui/NeuCard';
 import { NeuButton } from '../ui/NeuButton';
 import { NeuInput, NeuSelect } from '../ui/NeuForms';
@@ -89,7 +89,7 @@ export function OvertimePolicyTab() {
         <div className="flex flex-col md:flex-row justify-between items-md-center mb-6 gap-3">
           <div>
             <h5 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
-              <CalendarEvent className="text-red-500" size={20} /> Kalender Tanggal Merah & Libur Nasional
+              <Calendar className="text-red-500" size={20} /> Kalender Tanggal Merah & Libur Nasional
             </h5>
             <small className="text-neu-muted">Tanggal di bawah ini otomatis dihitung dengan pengali lembur hari libur (2.0x, 3.0x, 4.0x)</small>
           </div>
