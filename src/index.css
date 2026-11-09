@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-color: #e6ecf5;
+    --shadow-light: #ffffff;
+    --shadow-dark: #b8c2d1;
+  }
+  
+  body {
+    @apply bg-neu-bg text-neu-text antialiased overflow-x-hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Komponen Neumorphism ditransfer dari HTML asli */
+  .neu-card {
+    @apply bg-neu-bg rounded-[18px] transition-all duration-[250ms] ease-in-out border border-white/60;
+    box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+  }
+
+  .neu-inset {
+    @apply bg-neu-bg rounded-[14px] border border-white/20;
+    box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+  }
+
+  .neu-input {
+    @apply w-full bg-neu-bg border border-white/30 rounded-xl text-neu-text px-3.5 py-2.5 text-sm transition-all duration-200 outline-none;
+    box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .neu-input:focus {
+    @apply border-neu-primary;
+    box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light), 0 0 0 2px rgba(59, 130, 246, 0.3);
+  }
+}
