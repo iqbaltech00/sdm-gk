@@ -23,7 +23,6 @@ export function EmployeeList() {
     employee: any;
   }>({ isOpen: false, actionType: null, employee: null });
 
-  // Diubah menggunakan tipe any agar ref.current bisa di-assign
   const dropdownRef = useRef<any>(null);
 
   useEffect(() => {
@@ -179,6 +178,7 @@ export function EmployeeList() {
         onClose={() => setModalState({ isOpen: false, actionType: null, employee: null })}
         actionType={modalState.actionType}
         employee={modalState.employee}
+        onSuccess={loadEmployees}
       />
     </div>
   );

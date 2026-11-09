@@ -13,7 +13,8 @@ export async function uploadFileToSupabase(
 ): Promise<{ path: string; publicUrl: string } | { error: string }> {
   try {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36.substring(2, 9))}.${fileExt}`;
+    // Diperbaiki: .toString(36).substring(2, 9)
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
     const filePath = `${folderPath}/${fileName}`;
 
     // 1. Upload file ke Supabase Storage

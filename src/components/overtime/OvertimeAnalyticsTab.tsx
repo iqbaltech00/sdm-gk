@@ -13,7 +13,6 @@ export function OvertimeAnalyticsTab() {
   ];
 
   const handleExportReport = () => {
-    // Format data untuk ekspor spreadsheet
     const exportData = completedSPL.map(item => ({
       'ID SPL': item.id,
       'NIK': item.nik,
