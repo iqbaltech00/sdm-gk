@@ -77,7 +77,7 @@ export async function executeEmployeeMutation(mutationData: {
 export async function updateEmployeeStatus(nik: string, newStatus: string, catatan: string) {
   const { data, error } = await supabase
     .from('karyawan')
-    .update({ status: newStatus })
+    .update({ status: newStatus, catatan_status: catatan })
     .eq('nik', nik)
     .select()
     .single();
@@ -243,8 +243,21 @@ export async function createLeaveRequest(leaveData: {
   if (error) throw error;
   return data;
 }
+
+export async function updateLeaveStatus(id: string, newStatus: 'Disetujui' | 'Ditolak') {
+  const { data, error } = await supabase
+    .from('pengajuan_cuti')
+    .update({ status: newStatus })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // ==========================================
-// 4. SERVICE KEBIJAKAN & KALENDER LEMBUR (OVERTIME POLICY)
+// 4. SERVICE KEBIJAKAN & KALENDER LEMBUR
 // ==========================================
 export async function fetchUnitConfiguration() {
   const { data, error } = await supabase
@@ -266,9 +279,7 @@ export async function updateUnitConfiguration(config: { gaji_pokok_minimum: numb
     .select('id')
     .limit(1);
 
-  if (fetchError) {
-    throw fetchError;
-  }
+  if (fetchError) throw fetchError;
 
   if (existingList && existingList.length > 0) {
     const existingId = existingList[0].id;
@@ -330,12 +341,12 @@ export async function deleteHoliday(id: string) {
   if (error) throw error;
   return true;
 }
+
 // ==========================================
-// 5. SERVICE DOSSIER & CUTI (LEAVE & DOSSIER)
+// 5. SERVICE DOSSIER KARYAWAN
 // ==========================================
 export async function fetchEmployeeDossier(nik: string) {
   try {
-    // 1. Ambil data utama karyawan
     const { data: karyawan, error: empError } = await supabase
       .from('karyawan')
       .select('*')
@@ -344,21 +355,18 @@ export async function fetchEmployeeDossier(nik: string) {
 
     if (empError) throw empError;
 
-    // 2. Ambil riwayat mutasi
     const { data: mutasi } = await supabase
       .from('riwayat_mutasi')
       .select('*')
       .eq('nik', nik)
       .order('created_at', { ascending: false });
 
-    // 3. Ambil riwayat SP
     const { data: sp } = await supabase
       .from('riwayat_sp')
       .select('*')
       .eq('nik', nik)
       .order('created_at', { ascending: false });
 
-    // 4. Ambil riwayat dokumen
     const { data: dokumen } = await supabase
       .from('riwayat_dokumen')
       .select('*')
@@ -377,14 +385,121 @@ export async function fetchEmployeeDossier(nik: string) {
   }
 }
 
-export async function updateLeaveStatus(id: string, newStatus: 'Disetujui' | 'Ditolak') {
+// ==========================================
+// 6. SESSION PROFILE, FILTERED OVERTIME & STASIUN RANGKAP SERVICES
+// ==========================================
+export async function fetchUserSessionProfile() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Gagal mengambil profil session:', error.message);
+    return null;
+  }
+  return profile;
+}
+
+export async function fetchAllProfiles() {
   const { data, error } = await supabase
-    .from('pengajuan_cuti')
-    .update({ status: newStatus })
-    .eq('id', id)
+    .from('profiles')
+    .select('*')
+    .order('nama_lengkap', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateUserStasiunTambahan(userId: string, stasiunTambahan: string[]) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ stasiun_tambahan: stasiunTambahan })
+    .eq('id', userId)
     .select()
     .single();
 
   if (error) throw error;
+  return data;
+}
+
+export async function fetchOvertimeRequestsFiltered() {
+  const profile = await fetchUserSessionProfile();
+  
+  if (!profile) return [];
+
+  // Jika role pusat, ambil semua data tanpa filter bagian
+  if (['sdm', 'manager_keuangan', 'gm'].includes(profile.role)) {
+    const { data, error } = await supabase
+      .from('spl_lembur')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  // Jika role unit dengan stasiun tambahan (rangkap)
+  const stasiunTambahan: string[] = profile.stasiun_tambahan || [];
+
+  if (stasiunTambahan.length > 0) {
+    const filters = [
+      `bagian.eq.${profile.bagian}`,
+      ...stasiunTambahan.map(s => `stasiun.eq.${s}`)
+    ].join(',');
+
+    const { data, error } = await supabase
+      .from('spl_lembur')
+      .select('*')
+      .or(filters)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } else {
+    const { data, error } = await supabase
+      .from('spl_lembur')
+      .select('*')
+      .eq('bagian', profile.bagian)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+}
+// ==========================================
+// 7. SERVICE TANDA TANGAN DIGITAL (SIGNATURE)
+// ==========================================
+export async function uploadUserSignature(userId: string, file: File) {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `signature_${userId}_${Date.now()}.${fileExt}`;
+  const filePath = `signatures/${fileName}`;
+
+  // Upload ke Supabase Storage (bucket employee-docs)
+  const { error: uploadError } = await supabase.storage
+    .from('employee-docs')
+    .upload(filePath, file, { upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  // Dapatkan Public URL dari file yang diunggah
+  const { data: publicUrlData } = supabase.storage
+    .from('employee-docs')
+    .getPublicUrl(filePath);
+
+  const publicUrl = publicUrlData.publicUrl;
+
+  // Update kolom ttd_url pada tabel profiles
+  const { data, error: updateError } = await supabase
+    .from('profiles')
+    .update({ ttd_url: publicUrl })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (updateError) throw updateError;
   return data;
 }

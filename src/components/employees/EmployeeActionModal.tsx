@@ -1,5 +1,6 @@
+// src/components/employees/EmployeeActionModal.tsx
 import React, { useState, useEffect } from 'react';
-import { X, Shuffle, Upload, FolderPlus, AlertTriangle, Power, Download, CheckCircle, Loader2, FileText } from 'lucide-react';
+import { X, Shuffle, Upload, FolderPlus, AlertTriangle, Power, Download, CheckCircle, Loader2 } from 'lucide-react';
 import { NeuCard, NeuInset } from '../ui/NeuCard';
 import { NeuButton } from '../ui/NeuButton';
 import { NeuInput, NeuSelect } from '../ui/NeuForms';
@@ -10,6 +11,8 @@ import {
   updateEmployeeStatus,
   fetchEmployeeDossier 
 } from '../../services/api';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface EmployeeActionModalProps {
   isOpen: boolean;
@@ -19,13 +22,47 @@ interface EmployeeActionModalProps {
   onSuccess?: () => void;
 }
 
+// Pemetaan standar Stasiun ke Bagian SGN (Pembaruan Terbaru)
+const STASIUN_BAGIAN_MAP: Record<string, string> = {
+  // Instalasi
+  'GILINGAN': 'INSTALASI',
+  'KETEL': 'INSTALASI',
+  'LISTRIK & INSTRUMENT': 'INSTALASI',
+  'BESALI': 'INSTALASI',
+  
+  // Pengolahan
+  'PEMURNIAN': 'PENGOLAHAN',
+  'PENGUAPAN': 'PENGOLAHAN',
+  'MASAKAN': 'PENGOLAHAN',
+  'PUTARAN': 'PENGOLAHAN',
+  'SUGAR HANDLING': 'PENGOLAHAN',
+  
+  // Quality Assurance
+  'QA ON FARM': 'QUALITY ASSURANCE',
+  'QA OFF FARM': 'QUALITY ASSURANCE',
+  
+  // Keuangan & Umum
+  'KEUANGAN & GUDANG': 'KEUANGAN & UMUM',
+  'SDM&UMUM': 'KEUANGAN & UMUM',
+  'AKUTANSI & ADMIN HASIL': 'KEUANGAN & UMUM',
+  
+  // Tanaman
+  'TANAMAN WIL 1': 'TANAMAN',
+  'TANAMAN WIL 2': 'TANAMAN',
+  'TANAMAN WIL 3': 'TANAMAN',
+  'TANAMAN WIL 4': 'TANAMAN',
+  'TANAMAN WIL 5': 'TANAMAN',
+  'TMA': 'TANAMAN',
+  'BUDIDAYA': 'TANAMAN'
+};
+
 export function EmployeeActionModal({ isOpen, onClose, actionType, employee, onSuccess }: EmployeeActionModalProps) {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const [stasiunBaru, setStasiunBaru] = useState('GILINGAN');
-  const [bagianBaru, setBagianBaru] = useState('');
+  const [bagianBaru, setBagianBaru] = useState('INSTALASI');
   const [alasanMutasi, setAlasanMutasi] = useState('');
 
   const [jenisDokUtama, setJenisDokUtama] = useState('KTP');
@@ -48,17 +85,23 @@ export function EmployeeActionModal({ isOpen, onClose, actionType, employee, onS
 
   useEffect(() => {
     if (employee) {
-      setBagianBaru(employee.bagian || '');
-      setStasiunBaru(employee.stasiun || 'GILINGAN');
+      const initialStasiun = employee.stasiun || 'GILINGAN';
+      setStasiunBaru(initialStasiun);
+      setBagianBaru(STASIUN_BAGIAN_MAP[initialStasiun] || employee.bagian || 'INSTALASI');
       setStatusBaru(employee.status || 'Aktif');
     }
     setSuccessMsg('');
     setErrorMsg('');
   }, [employee, actionType]);
 
+  const handleStasiunChange = (val: string) => {
+    setStasiunBaru(val);
+    setBagianBaru(STASIUN_BAGIAN_MAP[val] || 'UMUM');
+  };
+
   if (!isOpen || !employee) return null;
 
-  const handleGenerateDossierPDF = async () => {
+  const handleDownloadDossierPDF = async () => {
     setGeneratingPdf(true);
     try {
       const dossier = await fetchEmployeeDossier(employee.nik);
@@ -69,88 +112,93 @@ export function EmployeeActionModal({ isOpen, onClose, actionType, employee, onS
         return;
       }
 
-      // Buat jendela cetak laporan resmi korporat
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Pop-up diblokir oleh browser. Harap izinkan pop-up untuk mencetak PDF.');
-        return;
-      }
+      const doc = new jsPDF();
+      
+      doc.setFontSize(14);
+      doc.setTextColor(43, 108, 176); 
+      doc.text('PT SINERGI GULA NUSANTARA', 14, 18);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text('SGN HR SUPER APP — DOSSIER & RIWAYAT PEKERJA', 14, 24);
+      doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 29);
 
-      const htmlContent = `
-        <!DOCTYPE html>
-        html>
-        <head>
-          <title>Dossier Karyawan - ${employee.nik} - ${employee.nama}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-            .header { text-align: center; border-bottom: 2px solid #2b6cb0; padding-bottom: 10px; margin-bottom: 20px; }
-            .header h2 { margin: 0; color: #2b6cb0; }
-            .header p { margin: 2px 0; font-size: 12px; color: #666; }
-            .section { margin-bottom: 20px; }
-            .section h4 { background: #edf2f7; padding: 8px; margin: 0 0 10px 0; border-left: 4px solid #2b6cb0; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 10px; }
-            th, td { border: 1px solid #cbd5e0; padding: 6px 8px; text-align: left; }
-            th { background: #f7fafc; }
-            .footer { margin-top: 40px; text-align: right; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h2>PT SINERGI GULA NUSANTARA</h2>
-            <p>SGN HR SUPER APP — DOSSIER & RIWAYAT PEKERJA</p>
-            <p>Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
-          </div>
+      doc.setDrawColor(43, 108, 176);
+      doc.setLineWidth(0.5);
+      doc.line(14, 33, 196, 33);
 
-          <div class="section">
-            <h4>1. Informasi Profil Utama</h4>
-            <table>
-              <tr><th>NIK</th><td>${dossier.karyawan.nik}</td><th>Nama Lengkap</th><td>${dossier.karyawan.nama}</td></tr>
-              <tr><th>Jabatan</th><td>${dossier.karyawan.jabatan || '-'}</td><th>Status Karyawan</th><td>${dossier.karyawan.status_karyawan}</td></tr>
-              <tr><th>Bagian / Stasiun</th><td>${dossier.karyawan.bagian} / ${dossier.karyawan.stasiun}</td><th>Status Keaktifan</th><td>${dossier.karyawan.status || 'Aktif'}</td></tr>
-            </table>
-          </div>
+      doc.setFontSize(11);
+      doc.setTextColor(45, 55, 72);
+      doc.text('1. Informasi Profil Utama', 14, 42);
 
-          <div class="section">
-            <h4>2. Riwayat Mutasi Stasiun / Unit Kerja</h4>
-            <table>
-              <tr><th>Stasiun Lama</th><th>Stasiun Baru</th><th>Bagian Baru</th><th>Alasan</th><th>Tanggal</th></tr>
-              ${dossier.mutasi.length > 0 ? dossier.mutasi.map((m: any) => `<tr><td>${m.stasiun_lama || '-'}</td><td>${m.stasiun_baru}</td><td>${m.bagian_baru}</td><td>${m.alasan}</td><td>${new Date(m.created_at).toLocaleDateString('id-ID')}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;">Tidak ada riwayat mutasi.</td></tr>'}
-            </table>
-          </div>
+      autoTable(doc, {
+        startY: 46,
+        head: [['Atribut', 'Keterangan']],
+        body: [
+          ['NIK', dossier.karyawan.nik],
+          ['Nama Lengkap', dossier.karyawan.nama],
+          ['Jabatan', dossier.karyawan.jabatan || '-'],
+          ['Status Karyawan', dossier.karyawan.status_karyawan],
+          ['Stasiun / Bagian', `${dossier.karyawan.stasiun} / ${dossier.karyawan.bagian}`],
+          ['Status Keaktifan', dossier.karyawan.status || 'Aktif']
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [43, 108, 176] },
+        styles: { fontSize: 9, cellPadding: 3 }
+      });
 
-          <div class="section">
-            <h4>3. Riwayat Disiplin (Surat Peringatan / SP)</h4>
-            <table>
-              <tr><th>Tingkat SP</th><th>Alasan Pelanggaran</th><th>Berlaku Sampai</th><th>Tanggal Terbit</th></tr>
-              ${dossier.sp.length > 0 ? dossier.sp.map((s: any) => `<tr><td>${s.tingkat_sp}</td><td>${s.alasan}</td><td>${s.berlaku_sampai}</td><td>${new Date(s.created_at).toLocaleDateString('id-ID')}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;">Bersih dari catatan Surat Peringatan.</td></tr>'}
-            </table>
-          </div>
+      let finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : 70;
 
-          <div class="section">
-            <h4>4. Rekam Jejak Dokumen & Sertifikasi</h4>
-            <table>
-              <tr><th>Jenis Dokumen</th><th>Keterangan</th><th>Masa Berlaku</th><th>Tanggal Upload</th></tr>
-              ${dossier.dokumen.length > 0 ? dossier.dokumen.map((d: any) => `<tr><td>${d.jenis_dokumen}</td><td>${d.keterangan_lain || '-'}</td><td>${d.expired_date || 'Selamanya'}</td><td>${new Date(d.created_at).toLocaleDateString('id-ID')}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;">Belum ada dokumen tercatat.</td></tr>'}
-            </table>
-          </div>
+      doc.text('2. Riwayat Mutasi Stasiun / Unit Kerja', 14, finalY);
+      const mutasiBody = dossier.mutasi.length > 0 
+        ? dossier.mutasi.map((m: any) => [m.stasiun_lama || '-', m.stasiun_baru, m.bagian_baru, m.alasan, new Date(m.created_at).toLocaleDateString('id-ID')])
+        : [['-', 'Tidak ada riwayat mutasi', '-', '-', '-']];
 
-          <div class="footer">
-            <p>Departemen Sumber Daya Manusia (SDM)</p>
-            <br/><br/>
-            <p><strong>( __________________________ )</strong></p>
-          </div>
-          <script>
-            window.onload = function() { window.print(); };
-          </script>
-        </body>
-        </html>
-      `;
+      autoTable(doc, {
+        startY: finalY + 4,
+        head: [['Stasiun Lama', 'Stasiun Baru', 'Bagian Baru', 'Alasan', 'Tanggal']],
+        body: mutasiBody,
+        theme: 'grid',
+        headStyles: { fillColor: [43, 108, 176] },
+        styles: { fontSize: 8, cellPadding: 3 }
+      });
 
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
+      finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : finalY + 40;
+
+      doc.text('3. Riwayat Disiplin (Surat Peringatan / SP)', 14, finalY);
+      const spBody = dossier.sp.length > 0
+        ? dossier.sp.map((s: any) => [s.tingkat_sp, s.alasan, s.berlaku_sampai, new Date(s.created_at).toLocaleDateString('id-ID')])
+        : [['-', 'Bersih dari catatan Surat Peringatan', '-', '-']];
+
+      autoTable(doc, {
+        startY: finalY + 4,
+        head: [['Tingkat SP', 'Alasan Pelanggaran', 'Berlaku Sampai', 'Tanggal Terbit']],
+        body: spBody,
+        theme: 'grid',
+        headStyles: { fillColor: [229, 62, 62] }, 
+        styles: { fontSize: 8, cellPadding: 3 }
+      });
+
+      finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : finalY + 40;
+
+      doc.text('4. Rekam Jejak Dokumen & Sertifikasi', 14, finalY);
+      const dokBody = dossier.dokumen.length > 0
+        ? dossier.dokumen.map((d: any) => [d.jenis_dokumen, d.keterangan_lain || '-', d.expired_date || 'Selamanya', new Date(d.created_at).toLocaleDateString('id-ID')])
+        : [['-', 'Belum ada dokumen tercatat', '-', '-']];
+
+      autoTable(doc, {
+        startY: finalY + 4,
+        head: [['Jenis Dokumen', 'Keterangan', 'Masa Berlaku', 'Tanggal Upload']],
+        body: dokBody,
+        theme: 'grid',
+        headStyles: { fillColor: [56, 161, 105] }, 
+        styles: { fontSize: 8, cellPadding: 3 }
+      });
+
+      doc.save(`Dossier_${employee.nik}_${employee.nama.replace(/\s+/g, '_')}.pdf`);
     } catch (err: any) {
       setGeneratingPdf(false);
-      alert('Gagal mencetak PDF Dossier: ' + err.message);
+      alert('Gagal mengunduh file PDF Dossier: ' + err.message);
     }
   };
 
@@ -255,18 +303,42 @@ export function EmployeeActionModal({ isOpen, onClose, actionType, employee, onS
               <>
                 <div>
                   <label className="block text-xs font-bold text-neu-muted mb-1">Stasiun Tujuan Baru</label>
-                  <NeuSelect value={stasiunBaru} onChange={(e) => setStasiunBaru(e.target.value)} required>
-                    <option value="GILINGAN">Stasiun Gilingan</option>
-                    <option value="PEMURNIAN">Stasiun Pemurnian</option>
-                    <option value="PENGUAPAN">Stasiun Penguapan</option>
-                    <option value="MASAKAN">Stasiun Masakan</option>
-                    <option value="PUTARAN">Stasiun Putaran</option>
-                    <option value="PENYELESAIAN">Stasiun Penyelesaian & Pengantongan</option>
+                  <NeuSelect value={stasiunBaru} onChange={(e) => handleStasiunChange(e.target.value)} required>
+                    <optgroup label="INSTALASI">
+                      <option value="GILINGAN">Gilingan</option>
+                      <option value="KETEL">Ketel</option>
+                      <option value="LISTRIK & INSTRUMENT">Listrik & Instrument</option>
+                    </optgroup>
+                    <optgroup label="PENGOLAHAN">
+                      <option value="PEMURNIAN">Pemurnian</option>
+                      <option value="PENGUAPAN">Penguapan</option>
+                      <option value="MASAKAN">Masakan</option>
+                      <option value="PUTARAN">Putaran</option>
+                      <option value="SUGAR HANDLING">Sugar Handling</option>
+                    </optgroup>
+                    <optgroup label="QUALITY ASSURANCE">
+                      <option value="QA ON FARM">QA On Farm</option>
+                      <option value="QA OFF FARM">QA Off Farm</option>
+                    </optgroup>
+                    <optgroup label="KEUANGAN & UMUM">
+                      <option value="KEUANGAN & GUDANG">Keuangan & Gudang</option>
+                      <option value="SDM&UMUM">SDM & Umum</option>
+                      <option value="AKUTANSI & ADMIN HASIL">Akuntansi & Admin Hasil</option>
+                    </optgroup>
+                    <optgroup label="TANAMAN">
+                      <option value="TANAMAN WIL 1">Tanaman Wilayah 1</option>
+                      <option value="TANAMAN WIL 2">Tanaman Wilayah 2</option>
+                      <option value="TANAMAN WIL 3">Tanaman Wilayah 3</option>
+                      <option value="TANAMAN WIL 4">Tanaman Wilayah 4</option>
+                      <option value="TANAMAN WIL 5">Tanaman Wilayah 5</option>
+                      <option value="TMA">TMA</option>
+                      <option value="BUDIDAYA">Budidaya</option>
+                    </optgroup>
                   </NeuSelect>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neu-muted mb-1">Bagian / Unit Kerja</label>
-                  <NeuInput type="text" value={bagianBaru} onChange={(e) => setBagianBaru(e.target.value)} placeholder="Contoh: Bagian Teknik / Pengolahan" required />
+                  <label className="block text-xs font-bold text-neu-muted mb-1">Bagian / Unit Kerja (Otomatis Mengikat Stasiun)</label>
+                  <NeuInput type="text" value={bagianBaru} readOnly className="bg-gray-100 font-bold text-blue-600 cursor-not-allowed" required />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-neu-muted mb-1">Keterangan / Alasan Mutasi</label>
@@ -367,9 +439,9 @@ export function EmployeeActionModal({ isOpen, onClose, actionType, employee, onS
 
             {actionType === 'pdf' && (
               <NeuInset className="p-4 text-center">
-                <p className="text-sm text-neu-muted mb-3">Dossier lengkap riwayat karyawan <strong className="text-gray-900">{employee.nama}</strong> siap diunduh dan dicetak dalam format laporan resmi.</p>
-                <NeuButton variant="primary" type="button" onClick={handleGenerateDossierPDF} disabled={generatingPdf}>
-                  {generatingPdf ? <><Loader2 className="animate-spin mr-2" size={16}/> Memuat Data Dossier...</> : <><Download size={16} className="mr-2" /> Cetak / Download PDF Dossier</>}
+                <p className="text-sm text-neu-muted mb-3">Dossier lengkap riwayat karyawan <strong className="text-gray-900">{employee.nama}</strong> siap diunduh secara otomatis sebagai dokumen PDF resmi.</p>
+                <NeuButton variant="primary" type="button" onClick={handleDownloadDossierPDF} disabled={generatingPdf}>
+                  {generatingPdf ? <><Loader2 className="animate-spin mr-2" size={16}/> Mengunduh File PDF...</> : <><Download size={16} className="mr-2" /> Download Otomatis File PDF Dossier</>}
                 </NeuButton>
               </NeuInset>
             )}
